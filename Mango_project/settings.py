@@ -1,3 +1,4 @@
+
 """
 Django settings for Mango_project project.
 

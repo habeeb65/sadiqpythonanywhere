@@ -6,6 +6,73 @@
     <!-- Custom admin CSS -->
     <link rel="stylesheet" href="{% static 'css/custom_admin.css' %}">
     <style>
+        /* Dashboard-specific styles */
+        .dashboard {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+        
+        .dashboard-container {
+            padding: 15px;
+            margin: 0;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        
+        /* Improve chart container sizing */
+        .chart-container {
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+        }
+        
+        /* Mobile optimization */
+        @media (max-width: 992px) {
+            #content-wrapper, .content-wrapper {
+                margin-left: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                overflow-x: hidden !important;
+            }
+            
+            .dashboard-container {
+                padding: 10px !important;
+            }
+            
+            .row .col {
+                padding: 5px !important;
+            }
+            
+            .card {
+                margin: 5px 0 !important;
+            }
+            
+            /* Ensure the sidebar is closed by default */
+            .main-sidebar {
+                transform: translateX(-250px) !important;
+            }
+            
+            /* But show when toggled */
+            body.sidebar-open .main-sidebar {
+                transform: translateX(0) !important;
+            }
+        }
+        
+        /* Ensure proper vertical spacing */
+        body, html {
+            height: auto !important;
+            min-height: 100vh;
+        }
+        
+        /* Fix any hidden scrollbars causing whitespace */
+        .os-viewport, .os-content {
+            overflow: visible !important;
+        }
+        
         /* Force sidebar to match home page with no scrollbars */
         .main-sidebar {
             width: 250px !important;
@@ -63,6 +130,8 @@
     {% block dashboard_styles %}{% endblock %}
 {% endblock %}
 
+{% block bodyclass %}dashboard{% endblock %}
+
 {% block content %}
 <div class="dashboard-container">
     {% block dashboard_content %}
@@ -75,23 +144,51 @@
     {{ block.super }}
     <!-- Additional dashboard-specific scripts can be added by child templates -->
     <script>
-        // Force sidebar to match styling and remove scrollbars only from sidebar
+        // Function to ensure proper layout on mobile
         document.addEventListener('DOMContentLoaded', function() {
-            document.body.classList.add('sidebar-fixed');
+            function fixMobileLayout() {
+                var isMobile = window.innerWidth <= 992;
+                
+                if (isMobile) {
+                    // Fix any containers that might cause overflow
+                    document.querySelectorAll('.container, .container-fluid, .row, .col, .card').forEach(function(element) {
+                        element.style.maxWidth = '100%';
+                        element.style.boxSizing = 'border-box';
+                        element.style.overflowX = 'hidden';
+                    });
+                    
+                    // Ensure content wrapper has proper margin
+                    var contentWrapper = document.querySelector('.content-wrapper');
+                    if (contentWrapper) {
+                        contentWrapper.style.marginLeft = '0';
+                        contentWrapper.style.width = '100%';
+                    }
+                    
+                    // Ensure the sidebar is closed by default
+                    var sidebar = document.querySelector('.main-sidebar');
+                    if (sidebar && !document.body.classList.contains('sidebar-open')) {
+                        sidebar.style.transform = 'translateX(-250px)';
+                    }
+                }
+            }
             
-            // Target only sidebar elements to hide scrollbars
-            const scrollElements = document.querySelectorAll('.sidebar, .nav-sidebar, .main-sidebar');
-            scrollElements.forEach(function(el) {
-                el.style.overflow = 'hidden';
-                el.style.overflowY = 'hidden';
-                el.style.overflowX = 'hidden';
-            });
+            // Run on page load
+            fixMobileLayout();
             
-            // Match active item color
-            document.querySelectorAll('.nav-sidebar .nav-item > .nav-link.active').forEach(function(el) {
-                el.style.backgroundColor = '#007bff';
-                el.style.color = 'white';
-            });
+            // Run on window resize
+            window.addEventListener('resize', fixMobileLayout);
+            
+            // Add event listeners for the sidebar toggle button if not already added
+            if (!window.sidebarToggleInitialized) {
+                var toggleButtons = document.querySelectorAll('[data-widget="pushmenu"]');
+                toggleButtons.forEach(function(button) {
+                    button.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        document.body.classList.toggle('sidebar-open');
+                    });
+                });
+                window.sidebarToggleInitialized = true;
+            }
         });
     </script>
     {% block dashboard_scripts %}{% endblock %}

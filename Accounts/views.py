@@ -26,7 +26,7 @@ from .models import PurchaseInvoice, SalesInvoice, Expense, Damages, PurchaseVen
 from django.urls import reverse
 from django.utils.dateparse import parse_date
 import datetime  # Import datetime module instead of just datetime class
-from .models import Payment  # Removed VendorBulkPayment, PaymentAllocation
+# Removed VendorBulkPayment, PaymentAllocation
 
 
 # Font and Logo Setup
@@ -1067,7 +1067,7 @@ def vendor_invoice_detail(request, vendor_id):
 def customer_invoice_detail(request, customer_id):
     customer = get_object_or_404(Customer, pk=customer_id)
     invoices = customer.sales_invoices.all().order_by('-invoice_date')
-    
+
     total_due = Decimal('0')
     for invoice in invoices:
         total_due += invoice.due_amount # Assuming due_amount is calculated correctly
@@ -1082,15 +1082,15 @@ def customer_invoice_detail(request, customer_id):
 def vendor_outstanding_invoices_api(request):
     """API endpoint to retrieve outstanding invoices for a vendor"""
     vendor_id = request.GET.get('vendor_id')
-    
+
     if not vendor_id:
         return JsonResponse({'error': 'Vendor ID is required'}, status=400)
-    
+
     try:
         vendor = PurchaseVendor.objects.get(id=vendor_id)
     except PurchaseVendor.DoesNotExist:
         return JsonResponse({'error': 'Vendor not found'}, status=404)
-    
+
     # Get all outstanding invoices for this vendor
     outstanding_invoices = PurchaseInvoice.objects.filter(
         vendor=vendor,
@@ -1098,7 +1098,7 @@ def vendor_outstanding_invoices_api(request):
     ).exclude(
         net_total_after_cash_cutting=F('paid_amount')
     ).order_by('date')
-    
+
     invoices_data = []
     for invoice in outstanding_invoices:
         invoices_data.append({
@@ -1111,7 +1111,7 @@ def vendor_outstanding_invoices_api(request):
             'paid_amount': float(invoice.paid_amount),
             'due_amount': float(invoice.due_amount)
         })
-    
+
     return JsonResponse({'invoices': invoices_data})
 
 @staff_member_required
@@ -1125,28 +1125,28 @@ def add_vendor(request):
         name = request.POST.get('name', '').strip()
         contact_number = request.POST.get('contact_number', '').strip()
         area = request.POST.get('area', '').strip()
-        
+
         # Validate form
         if not name:
             return render(request, 'Accounts/add_vendor_popup.html', {'error': 'Vendor name is required.'})
-        
+
         # Create the vendor
         vendor = PurchaseVendor.objects.create(
             name=name,
             contact_number=contact_number,
             area=area
         )
-        
+
         # If this is a popup request
         if '_popup' in request.POST:
             return HttpResponse(
-                '<script type="text/javascript">opener.dismissAddRelatedObjectPopup(window, "%s", "%s");</script>' % 
+                '<script type="text/javascript">opener.dismissAddRelatedObjectPopup(window, "%s", "%s");</script>' %
                 (str(vendor.pk), str(vendor.name).replace('"', '\\"'))
             )
-        
+
         # If not a popup, redirect to a success page
         return render(request, 'Accounts/add_vendor_popup_success.html', {'vendor': vendor})
-    
+
     # If GET request, show the form
     return render(request, 'Accounts/add_vendor_popup.html')
 
@@ -1155,4 +1155,3 @@ def test_connection(request):
     Simple view to test server connection.
     """
     return HttpResponse("Server is running correctly! Connection test successful.")
-

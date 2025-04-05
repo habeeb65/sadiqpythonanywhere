@@ -18,13 +18,10 @@ urlpatterns = [
     path('generate-expense-pdf/<int:pk>/', views.generate_expense_pdf, name='generate_expense_pdf'),
     path('generate-damage-pdf/<int:pk>/', views.generate_damage_pdf, name='generate_damage_pdf'),
     path('generate-packaging-pdf/<int:invoice_id>/', views.generate_packaging_invoice_pdf, name='generate_packaging_pdf'),
-    
-    # Add vendor popup
     path('add-vendor/', views.add_vendor, name='add_vendor'),
-    
-    # Test connection
     path('test-connection/', views.test_connection, name='test_connection'),
-    
-    # API Endpoints
     path('api/vendor-outstanding-invoices/', views.vendor_outstanding_invoices_api, name='vendor_outstanding_invoices_api'),
+
 ]
+
+

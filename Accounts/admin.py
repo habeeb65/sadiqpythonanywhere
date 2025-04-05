@@ -432,6 +432,7 @@ admin.site.register(PurchaseVendor, PurchaseVendorAdmin)
 admin.site.register(PurchaseInvoice, PurchaseInvoiceAdmin)
 admin.site.register(PurchaseProduct, PurchaseProductAdmin)
 admin.site.register(Payment, PaymentAdmin)
+
 # Registering Sales models
 admin.site.register(SalesInvoice, SalesInvoiceAdmin)
 admin.site.register(SalesProduct, SalesProductAdmin)
@@ -442,4 +443,7 @@ admin.site.register(Expense, ExpenseAdmin)
 admin.site.register(Damages, DamagesAdmin)
 admin.site.register(SalesLot) # Simple registration for now
 admin.site.register(Packaging_Invoice, packagingsAdmin)
+
+
+admin.register(SalesInvoice, SalesInvoiceAdmin)
 
