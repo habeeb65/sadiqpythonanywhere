@@ -1,0 +1,104 @@
+{% extends 'admin/base_site.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="receipt-container">
+        <div class="receipt-header text-center">
+            <h2>Customer Bulk Payment Receipt</h2>
+            <p>Date: {{ today|date:"d-m-Y" }}</p>
+        </div>
+
+        <div class="receipt-details">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Customer Name:</strong> {{ customer.name }}</p>
+                    <p><strong>Customer GSTIN:</strong> {{ customer.gstin }}</p>
+                    <p><strong>Customer Address:</strong> {{ customer.address }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Payment Mode:</strong> {{ payment_mode }}</p>
+                    <p><strong>Total Amount:</strong> ₹{{ total_payment|floatformat:2 }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="receipt-invoices mt-4">
+            <h4>Paid Invoices</h4>
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Invoice Number</th>
+                        <th>Date</th>
+                        <th>Amount Paid</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for detail in payment_details %}
+                        <tr>
+                            <td>{{ detail.invoice.invoice_number }}</td>
+                            <td>{{ detail.invoice.invoice_date|date:"d-m-Y" }}</td>
+                            <td>₹{{ detail.amount|floatformat:2 }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if remaining_payment > 0 %}
+        <div class="alert alert-warning mt-3">
+            <strong>Note:</strong> Remaining amount of ₹{{ remaining_payment|floatformat:2 }} was not applied to any invoices.
+        </div>
+        {% endif %}
+
+        <div class="receipt-footer mt-4">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Total Amount:</strong> ₹{{ total_payment|floatformat:2 }}</p>
+                </div>
+                <div class="col-md-6 text-right">
+                    <p><strong>Authorized Signatory</strong></p>
+                    <p>___________________</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mt-4">
+        <button onclick="window.print()" class="btn btn-primary">Print Receipt</button>
+        <a href="{% url 'customer_bulk_payment' %}" class="btn btn-secondary">Make Another Payment</a>
+    </div>
+</div>
+
+<style>
+    @media print {
+        .receipt-container {
+            width: 100%;
+            padding: 20px;
+        }
+        .btn {
+            display: none;
+        }
+    }
+    .receipt-container {
+        border: 1px solid #ddd;
+        padding: 20px;
+        margin: 20px 0;
+    }
+    .receipt-header {
+        border-bottom: 2px solid #000;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+    }
+    .receipt-details {
+        margin-bottom: 20px;
+    }
+    .receipt-invoices {
+        margin-bottom: 20px;
+    }
+    .receipt-footer {
+        border-top: 2px solid #000;
+        padding-top: 20px;
+    }
+</style>
+{% endblock %} 

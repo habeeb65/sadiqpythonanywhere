@@ -8,13 +8,13 @@
         overflow: visible !important;
         max-height: none !important;
     }
-    
+
     /* Make navigation items closer */
     .nav-item {
         margin-bottom: 0 !important;
         padding: 0 !important;
     }
-    
+
     /* Custom navigation styling */
     .custom-nav-header {
         padding: 10px;
@@ -23,19 +23,19 @@
         font-weight: bold;
         margin-top: 10px;
     }
-    
+
     .custom-nav-link {
         display: block;
         padding: 8px 16px;
         color: #666;
         text-decoration: none !important;
     }
-    
+
     .custom-nav-link:hover {
         background-color: #f5f5f5;
         color: #417690;
     }
-    
+
     .custom-nav-link.active {
         background-color: #417690;
         color: white;
@@ -73,8 +73,48 @@
                     Customer Summary
                 </a>
             </li>
+            <li>
+                <a href="{% url 'customer_bulk_payment' %}" class="custom-nav-link {% if request.path == '/accounts/customer-bulk-payment/' %}active{% endif %}">
+                    Customer Bulk Payment
+                </a>
+            </li>
         </ul>
     </div>
+{% endblock %}
+
+{% block nav-global %}
+<style>
+    .top-menu-bar {
+        width: 100%;
+        background: #417690;
+        padding: 0;
+        margin: 0 0 20px 0;
+        display: flex;
+        align-items: center;
+        min-height: 48px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+        z-index: 1000;
+    }
+    .top-menu-bar .top-menu-link {
+        color: #fff;
+        padding: 0 24px;
+        line-height: 48px;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 16px;
+        transition: background 0.2s, color 0.2s;
+        display: inline-block;
+    }
+    .top-menu-bar .top-menu-link:hover, .top-menu-bar .top-menu-link.active {
+        background: #35516a;
+        color: #ffd700;
+    }
+</style>
+<div class="top-menu-bar">
+    <a href="{% url 'admin-dashboard' %}" class="top-menu-link{% if request.path == '/admin/dashboard/' %} active{% endif %}">Dashboard</a>
+    <a href="{% url 'customer_purchase_summary' %}" class="top-menu-link{% if request.path == '/accounts/customer-summary/' %} active{% endif %}">Customer Summary</a>
+    <a href="{% url 'customer_bulk_payment' %}" class="top-menu-link{% if request.path == '/accounts/customer-bulk-payment/' %} active{% endif %}">Customer Bulk Payment</a>
+</div>
 {% endblock %}
 
 <!-- Add Vendor Modal -->

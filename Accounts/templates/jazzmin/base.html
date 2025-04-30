@@ -1,0 +1,40 @@
+{% extends "jazzmin/base.html" %}
+
+{% block nav-global %}
+<style>
+    .top-menu-bar {
+        width: 100%;
+        background: #417690;
+        padding: 0;
+        margin: 0 0 20px 0;
+        display: flex;
+        align-items: center;
+        min-height: 48px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+        z-index: 1000;
+    }
+    .top-menu-bar .top-menu-link {
+        color: #fff;
+        padding: 0 24px;
+        line-height: 48px;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 16px;
+        transition: background 0.2s, color 0.2s;
+        display: inline-block;
+    }
+    .top-menu-bar .top-menu-link:hover, .top-menu-bar .top-menu-link.active {
+        background: #35516a;
+        color: #ffd700;
+    }
+</style>
+<div class="top-menu-bar">
+    <a href="{% url 'admin-dashboard' %}" class="top-menu-link{% if request.path == '/admin/dashboard/' %} active{% endif %}">Dashboard</a>
+    <a href="{% url 'customer_purchase_summary' %}" class="top-menu-link{% if request.path == '/accounts/customer-summary/' %} active{% endif %}">Customer Summary</a>
+    <a href="{% url 'customer_bulk_payment' %}" class="top-menu-link{% if request.path == '/accounts/customer-bulk-payment/' %} active{% endif %}">Customer Bulk Payment</a>
+</div>
+{% endblock %}
+
+{% block content %}
+    {{ block.super }}
+{% endblock %} 

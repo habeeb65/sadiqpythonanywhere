@@ -1,0 +1,303 @@
+{% extends "admin/base.html" %}
+
+{% block extrahead %}
+{{ block.super }}
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+    /* Fix specific Jazzmin issues causing vertical whitespace */
+    html, body {
+      height: 100% !important;
+      min-height: 100% !important;
+      max-height: none !important;
+      overflow-x: hidden !important;
+      position: relative !important;
+    }
+    
+    .wrapper {
+      min-height: 100% !important;
+      height: auto !important;
+      position: relative !important;
+    }
+    
+    div.wrapper:after {
+      display: none !important;
+      content: none !important;
+      height: 0 !important;
+    }
+    
+    .layout-fixed .wrapper .content-wrapper {
+      margin-top: 0 !important;
+    }
+    
+    /* Fix horizontal navbar in portrait mode */
+    .navbar-nav.d-none,
+    .navbar-nav.d-none.d-md-flex,
+    .navbar-nav.d-md-flex,
+    .navbar-collapse.collapse:not(.show) {
+      display: flex !important;
+      overflow-x: auto !important;
+      flex-wrap: nowrap !important;
+      white-space: nowrap !important;
+      width: 100% !important;
+    }
+    
+    /* Fix mobile issues */
+    @media (max-width: 992px) {
+      /* Critical fix for the semi-transparent whitespace */
+      body:not(.sidebar-open) .wrapper .main-sidebar {
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+        visibility: hidden !important;
+        display: none !important;
+        position: absolute !important;
+      }
+      
+      body:not(.sidebar-open) .wrapper .content-wrapper {
+        margin-left: 0 !important;
+        padding-left: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      
+      body {
+        height: auto !important;
+        overflow-y: auto !important;
+      }
+      
+      .content-wrapper {
+        margin-left: 0 !important;
+        min-height: auto !important;
+      }
+      
+      .wrapper {
+        overflow-y: hidden !important;
+      }
+      
+      /* Fix excess space at bottom */
+      body::after, html::after,
+      .wrapper::after, .content-wrapper::after {
+        display: none !important;
+        content: none !important;
+        height: 0 !important;
+      }
+      
+      /* Ensure left sidebar container doesn't affect layout */
+      .main-sidebar-container {
+        display: none !important;
+      }
+      
+      /* Jazzmin specific fixes for mobile - remove transparent whitespace */
+      .nav-sidebar, #jazzy-sidebar {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+      }
+      
+      body.sidebar-open .nav-sidebar,
+      body.sidebar-open #jazzy-sidebar {
+        display: block !important;
+        visibility: visible !important;
+        width: 250px !important;
+      }
+      
+      /* Always show horizontal navbar */
+      #jazzy-navbar-menu,
+      #jazzy-topmenu,
+      .navbar-collapse.collapse,
+      .navbar-nav {
+        display: flex !important;
+        overflow-x: auto !important;
+        width: 100% !important;
+      }
+    }
+</style>
+<script>
+    // Fix for mobile whitespace issue
+    document.addEventListener('DOMContentLoaded', function() {
+      function fixMobileWhitespace() {
+        var isMobile = window.innerWidth <= 992;
+        
+        if (isMobile) {
+          // Fix body and html
+          document.body.style.width = '100%';
+          document.body.style.maxWidth = '100%';
+          document.body.style.overflowX = 'hidden';
+          document.body.style.margin = '0';
+          document.body.style.padding = '0';
+          document.documentElement.style.width = '100%';
+          document.documentElement.style.maxWidth = '100%';
+          document.documentElement.style.overflowX = 'hidden';
+          
+          // Fix wrapper
+          var wrapper = document.querySelector('.wrapper') || document.getElementById('wrapper');
+          if (wrapper) {
+            wrapper.style.width = '100%';
+            wrapper.style.maxWidth = '100%';
+            wrapper.style.margin = '0';
+            wrapper.style.padding = '0';
+            wrapper.style.overflow = 'hidden';
+            
+            // Fix the ::after pseudo-element
+            if (wrapper.style.setProperty) {
+              wrapper.style.setProperty('--after-display', 'none', 'important');
+            }
+          }
+          
+          // Fix content wrapper
+          var contentWrapper = document.querySelector('.content-wrapper');
+          if (contentWrapper) {
+            contentWrapper.style.marginLeft = '0';
+            contentWrapper.style.width = '100%';
+            contentWrapper.style.maxWidth = '100%';
+            contentWrapper.style.paddingLeft = '0';
+            contentWrapper.style.paddingRight = '0';
+            contentWrapper.style.minHeight = 'auto';
+            
+            // Fix the ::after pseudo-element
+            if (contentWrapper.style.setProperty) {
+              contentWrapper.style.setProperty('--after-display', 'none', 'important');
+            }
+          }
+          
+          // Ensure the sidebar is properly hidden on mobile
+          if (!document.body.classList.contains('sidebar-open')) {
+            var sidebar = document.querySelector('.main-sidebar');
+            if (sidebar) {
+              sidebar.style.transform = 'translateX(-250px)';
+              sidebar.style.width = '0';
+              sidebar.style.minWidth = '0';
+              sidebar.style.maxWidth = '0';
+              sidebar.style.padding = '0';
+              sidebar.style.margin = '0';
+              sidebar.style.overflow = 'hidden';
+              sidebar.style.visibility = 'hidden';
+              
+              // Additional fix for jazzmin
+              var navSidebar = document.querySelector('.nav-sidebar');
+              if (navSidebar) {
+                navSidebar.style.display = 'none';
+                navSidebar.style.width = '0';
+              }
+            }
+          } else {
+            var sidebar = document.querySelector('.main-sidebar');
+            if (sidebar) {
+              sidebar.style.transform = 'translateX(0)';
+              sidebar.style.width = '250px';
+              sidebar.style.minWidth = '250px';
+              sidebar.style.maxWidth = '250px';
+              sidebar.style.visibility = 'visible';
+              
+              // Additional fix for jazzmin
+              var navSidebar = document.querySelector('.nav-sidebar');
+              if (navSidebar) {
+                navSidebar.style.display = 'block';
+                navSidebar.style.width = '250px';
+              }
+            }
+          }
+          
+          // Fix excess vertical space
+          var footer = document.querySelector('.main-footer');
+          if (footer) {
+            footer.style.position = 'relative';
+            footer.style.bottom = '0';
+          }
+          
+          // Find and remove any elements causing whitespace
+          var adminContent = document.getElementById('adminContent');
+          if (adminContent) {
+            adminContent.style.height = 'auto';
+            adminContent.style.minHeight = '0';
+          }
+          
+          // Show horizontal navigation bar
+          var navbarNav = document.querySelectorAll('.navbar-nav');
+          navbarNav.forEach(function(nav) {
+            if (!nav.classList.contains('ml-auto')) {
+              nav.style.display = 'flex';
+              nav.style.flexWrap = 'nowrap';
+              nav.style.overflowX = 'auto';
+              nav.style.width = '100%';
+              
+              // Force all nav items to be visible
+              var navItems = nav.querySelectorAll('.nav-item');
+              navItems.forEach(function(item) {
+                item.style.display = 'block';
+              });
+            }
+          });
+          
+          // Make sure navbar is visible
+          var navbarCollapse = document.querySelector('.navbar-collapse.collapse');
+          if (navbarCollapse) {
+            navbarCollapse.style.display = 'flex';
+            navbarCollapse.style.flexWrap = 'nowrap';
+            navbarCollapse.style.overflowX = 'auto';
+          }
+          
+          // Jazzmin specific navbar fixes
+          var jazzyNavbarMenu = document.getElementById('jazzy-navbar-menu');
+          var jazzyTopMenu = document.getElementById('jazzy-topmenu');
+          
+          if (jazzyNavbarMenu) {
+            jazzyNavbarMenu.style.display = 'flex';
+            jazzyNavbarMenu.style.overflowX = 'auto';
+            jazzyNavbarMenu.style.flexWrap = 'nowrap';
+            jazzyNavbarMenu.style.width = '100%';
+          }
+          
+          if (jazzyTopMenu) {
+            jazzyTopMenu.style.display = 'flex';
+            jazzyTopMenu.style.overflowX = 'auto';
+            jazzyTopMenu.style.flexWrap = 'nowrap';
+            jazzyTopMenu.style.width = '100%';
+          }
+        }
+      }
+      
+      // Run on load
+      fixMobileWhitespace();
+      
+      // Run on resize
+      window.addEventListener('resize', fixMobileWhitespace);
+      
+      // Add event listeners for the sidebar toggle button
+      var toggleButtons = document.querySelectorAll('[data-widget="pushmenu"]');
+      toggleButtons.forEach(function(button) {
+        button.addEventListener('click', function(e) {
+          e.preventDefault();
+          document.body.classList.toggle('sidebar-open');
+          
+          // Run the fix again to properly update the sidebar visibility
+          setTimeout(fixMobileWhitespace, 10);
+          
+          // Add click outside to close
+          if (document.body.classList.contains('sidebar-open')) {
+            setTimeout(function() {
+              document.addEventListener('click', closeSidebarOnClickOutside);
+            }, 100);
+          }
+        });
+      });
+      
+      // Function to close sidebar when clicking outside
+      function closeSidebarOnClickOutside(e) {
+        var sidebar = document.querySelector('.main-sidebar');
+        var toggleButton = document.querySelector('[data-widget="pushmenu"]');
+        
+        if (sidebar && !sidebar.contains(e.target) && !toggleButton.contains(e.target)) {
+          document.body.classList.remove('sidebar-open');
+          document.removeEventListener('click', closeSidebarOnClickOutside);
+          
+          // Run the fix again to properly update the sidebar visibility
+          setTimeout(fixMobileWhitespace, 10);
+        }
+      }
+    });
+</script>
+{% endblock %}

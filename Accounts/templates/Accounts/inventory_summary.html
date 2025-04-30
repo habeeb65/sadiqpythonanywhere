@@ -1,0 +1,153 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% load summary_tags %}
+
+{% block extrahead %}
+<style>
+    .summary-container {
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .filter-section {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    .filter-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: flex-end;
+    }
+    .filter-form .form-group {
+        flex: 1;
+        min-width: 200px;
+    }
+    .filter-form label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+    .filter-form input, .filter-form button {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    .filter-form button {
+        background-color: #417690;
+        color: white;
+        border: none;
+        cursor: pointer;
+        padding: 8px 15px;
+    }
+    .filter-form button:hover {
+        background-color: #2b5070;
+    }
+    .summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    .summary-table th, .summary-table td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: left;
+    }
+    .summary-table th {
+        background-color: #f2f2f2;
+    }
+    .summary-table tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+    .summary-table tr:hover {
+        background-color: #f1f1f1;
+    }
+    .numeric {
+        text-align: right;
+    }
+    .status-available { color: green; }
+    .status-sold { color: red; }
+    .status-damaged { color: orange; }
+    .status-reserved { color: blue; }
+    .action-buttons {
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="summary-container">
+    <h1>Inventory Summary</h1>
+    
+    <div class="filter-section">
+        <form method="get" class="filter-form">
+            <div class="form-group">
+                <label for="from_date">From Date:</label>
+                <input type="date" id="from_date" name="from_date" value="{{ from_date }}">
+            </div>
+            <div class="form-group">
+                <label for="to_date">To Date:</label>
+                <input type="date" id="to_date" name="to_date" value="{{ to_date }}">
+            </div>
+            <div class="form-group">
+                <label for="search">Search Lot:</label>
+                <input type="text" id="search" name="search" placeholder="Lot number, status..." value="{{ search_query }}">
+            </div>
+            <div class="form-group">
+                <button type="submit">Apply Filters</button>
+                <a href="{% url 'inventory_summary' %}" class="reset-link">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="action-buttons">
+        <button onclick="window.print()">Print Summary</button>
+        <button onclick="exportToExcel()">Export to Excel</button>
+    </div>
+
+    <table class="summary-table">
+        <thead>
+            <tr>
+                <th>Lot Number</th>
+                <th>Purchase Date</th>
+                <th class="numeric">Total Purchased</th>
+                <th class="numeric">Total Sold</th>
+                <th class="numeric">Current Stock</th>
+                <th>Status</th>
+                <th>Last Modified</th>
+                <th>Modified By</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for lot in lots %}
+            <tr>
+                <td>{{ lot.lot_number }}</td>
+                <td>{{ lot.date|date:"M d, Y" }}</td>
+                <td class="numeric">{{ lot.total_purchased|floatformat:2 }} kg</td>
+                <td class="numeric">{{ lot.total_sold|floatformat:2 }} kg</td>
+                <td class="numeric">{{ lot.current_stock|floatformat:2 }} kg</td>
+                <td class="status-{{ lot.current_status|lower }}">{{ lot.current_status }}</td>
+                <td>{{ lot.last_modified|date:"M d, Y"|default:"-" }}</td>
+                <td>{{ lot.modified_by }}</td>
+                <td>
+                    <button onclick="updateStatus('{{ lot.id }}')">Update</button>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="9" style="text-align: center;">No inventory data found matching your criteria.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Status Update Modal (keep your existing modal code here) -->
+<script>
+// Keep your existing JavaScript code here
+</script>
+{% endblock %}

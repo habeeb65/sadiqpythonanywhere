@@ -7,4 +7,6 @@ JAZZMIN_SETTINGS = {
         # ... rest of your existing menu items ...
     ],
     # ... other jazzmin settings ...
+    "custom_js": None,  # Make sure this is None or points to a valid JS file
 }
+

@@ -1,4 +1,3 @@
-
 """
 Django settings for Mango_project project.
 
@@ -10,18 +9,14 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-
 from pathlib import Path
 import os
-from dotenv import load_dotenv
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 MEDIA_URL = ''
 MEDIA_ROOT = BASE_DIR / ''
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-z5zrj!poao3_81z3&4#)hg29(xv7%pow%asnrqw+o*^l!@60b@'
@@ -29,7 +24,7 @@ SECRET_KEY = 'django-insecure-z5zrj!poao3_81z3&4#)hg29(xv7%pow%asnrqw+o*^l!@60b@
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['habeeb321.pythonanywhere.com', '127.0.0.1', 'localhost']
+ALLOWED_HOSTS = ['MohammedSadiq.pythonanywhere.com', '127.0.0.1', 'localhost']
 
 
 
@@ -37,6 +32,7 @@ ALLOWED_HOSTS = ['habeeb321.pythonanywhere.com', '127.0.0.1', 'localhost']
 
 INSTALLED_APPS = [
     'jazzmin',
+    'Accounts',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -44,7 +40,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
-    'Accounts',
 ]
 
 MIDDLEWARE = [
@@ -63,7 +58,7 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
             os.path.join(BASE_DIR, 'templates'),
-            os.path.join(BASE_DIR, 'Accounts', 'Template'),
+            os.path.join(BASE_DIR, 'Accounts', 'templates'),
         ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -86,11 +81,15 @@ WSGI_APPLICATION = 'Mango_project.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.environ.get('DB_NAME'), # e.g., habeeb321$starmango
-        'USER': os.environ.get('DB_USER'), # e.g., habeeb321
-        'PASSWORD': os.environ.get('DB_PASSWORD'), # Your MySQL password
-        'HOST': os.environ.get('DB_HOST'), # e.g., habeeb321.mysql.pythonanywhere-services.com
-        'PORT': os.environ.get('DB_PORT', '3306'), # Default to 3306 if not set
+        'NAME': 'MohammedSadiq$starmango',  # Your PythonAnywhere database name
+        'USER': 'MohammedSadiq',  # Your PythonAnywhere username
+        'PASSWORD': '',  # Your PythonAnywhere database password
+        'HOST': 'MohammedSadiq.mysql.pythonanywhere-services.com',
+        'PORT': '3306',
+        'OPTIONS': {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+            'charset': 'utf8mb4',
+        }
     }
 }
 
@@ -153,87 +152,84 @@ JAZZMIN_SETTINGS = {
     # title of the window (Will default to current_admin_site.site_title if absent or None)
     "site_title": "Star Mango Admin",
     # Title on the login screen (19 chars max) (defaults to current_admin_site.site_header if absent or None)
-    "site_header": "Star Mango Supplies Korutla",
-    # Logo to use for your site, must be present in static files
-    "site_logo": None,
-    # CSS classes that are applied to the logo
-    "site_logo_classes": None,
-    # Logo to use for login form in dark themes
-    "login_logo": None,
-    # Relative path to a favicon for your site, will default to site_logo if absent
-    "site_icon": None,
+    "site_header": "Star Mango",
+    # Title on the brand (19 chars max) (defaults to current_admin_site.site_header if absent or None)
+    "site_brand": "Star Mango",
+    # Logo to use for your site, must be present in static files, used for brand on top left
+    "site_logo": "LOGO.png",
     # Welcome text on the login screen
-    "welcome_sign": "Welcome to Star Mango Supplies Admin",
+    "welcome_sign": "Welcome to Star Mango Admin",
     # Copyright on the footer
     "copyright": "Star Mango Ltd",
-
+    # The model admin to search from the search bar, search bar omitted if excluded
+    "search_model": "auth.User",
     # Field name on user model that contains avatar ImageField/URLField/Charfield or a callable that receives the user
     "user_avatar": None,
-
-    # Top menu
-    "topmenu_links": [
-        {"name": "Home", "url": "admin:index", "permissions": ["auth.view_user"]},
-        {"name": "Dashboard", "url": "admin-dashboard", "permissions": ["auth.view_user"]},
-        {"name": "Vendor Summary", "url": "/accounts/vendor-summary/"},
-        {"name": "Customer Summary", "url": "/accounts/customer-summary/"},
-    ],
-
-    # Custom links to append to app groups, keyed on app name
-    "custom_links": {
-        "Accounts": [
-            {"name": "Dashboard", "url": "admin-dashboard", "icon": "fas fa-chart-line"}
-        ]
-    },
-
-    # Override app/model ordering by 3 ways
-    "order_with_respect_to": ["Accounts", "auth"],
-    "custom_app_order": ["Accounts", "auth"],
-    # Specify how models are ordered specifically by app
-    "custom_apps_models": {
-        "Accounts": [
-            "PurchaseInvoice",
-            "SalesInvoice",
-            "PurchaseVendor",
-            "Customer",
-            "Product",
-            "Payment",
-            "Expense",
-            "Damages",
-        ],
-    },
-
-    # Specify an app to hide all of its models
-    "hide_apps": [],
-
-    # Specify models to hide
-    "hide_models": [],
-
-    # Specify how models are ordered
+    # Whether to display the side menu
     "show_sidebar": True,
-    "navigation_expanded": False,
-
-    # Icons
+    # Whether to aut expand the menu
+    "navigation_expanded": True,
+    # List of apps (and/or models) to base side menu ordering off of (does not need to contain all apps/models)
+    "order_with_respect_to": ["auth", "Accounts"],
+    # Custom icons for side menu apps/models
     "icons": {
         "auth": "fas fa-users-cog",
         "auth.user": "fas fa-user",
         "auth.Group": "fas fa-users",
-        "Accounts.PurchaseInvoice": "fas fa-shopping-cart",
-        "Accounts.SalesInvoice": "fas fa-cash-register",
+        "Accounts.Customer": "fas fa-user-tie",
         "Accounts.Product": "fas fa-box",
-        "Accounts.PurchaseVendor": "fas fa-users",
-        "Accounts.Customer": "fas fa-user-friends",
-        "Accounts.Expense": "fas fa-money-bill",
-        "Accounts.Damages": "fas fa-exclamation-triangle"
+        "Accounts.PurchaseInvoice": "fas fa-file-invoice",
+        "Accounts.SalesInvoice": "fas fa-file-invoice-dollar",
     },
-
-    # UI Settings
-    "custom_css": "css/custom_admin.css",
-    "custom_js": None,
-    "use_google_fonts_cdn": True,
-    "show_ui_builder": False,
-    "changeform_format": "horizontal_tabs",
-    "related_modal_active": True
+    # Icons that are used when one is not manually specified
+    "default_icon_parents": "fas fa-chevron-circle-right",
+    "default_icon_children": "fas fa-circle",
+    # Whether to show the UI customizer on the sidebar
+    "show_ui_builder": True,
+    "topmenu_links": [
+        # Dashboard
+        {"name": "Dashboard", "url": "admin-dashboard", "permissions": ["auth.view_user"]},
+        # Customer Summary
+        {"name": "Customer Summary", "url": "customer_purchase_summary", "permissions": ["auth.view_user"]},
+        # Customer Bulk Payment
+        {"name": "Customer Bulk Payment", "url": "customer_bulk_payment", "permissions": ["auth.view_user"]},
+    ],
 }
+
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text": False,
+    "footer_small_text": False,
+    "body_small_text": False,
+    "brand_small_text": False,
+    "brand_colour": "navbar-primary",
+    "accent": "accent-primary",
+    "navbar": "navbar-dark",
+    "no_navbar_border": False,
+    "navbar_fixed": False,
+    "layout_boxed": False,
+    "footer_fixed": False,
+    "sidebar_fixed": False,
+    "sidebar": "sidebar-dark-primary",
+    "sidebar_nav_small_text": False,
+    "sidebar_disable_expand": False,
+    "sidebar_nav_child_indent": False,
+    "sidebar_nav_compact_style": False,
+    "sidebar_nav_legacy_style": False,
+    "sidebar_nav_flat_style": False,
+    "theme": "default",
+    "dark_mode_theme": None,
+    "button_classes": {
+        "primary": "btn-primary",
+        "secondary": "btn-secondary",
+        "info": "btn-info",
+        "warning": "btn-warning",
+        "danger": "btn-danger",
+        "success": "btn-success"
+    }
+}
+
+ROOT_URLCONF = 'Mango_project.urls'
+X_FRAME_OPTIONS = 'SAMEORIGIN'
 ROOT_URLCONF = 'Mango_project.urls'
 
 # Add this setting to allow admin popups (which use iframes)

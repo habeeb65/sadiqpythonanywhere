@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Customer Bulk Payment</h2>
+    
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-group mb-3">
+                    <label for="customer">Select Customer</label>
+                    <select class="form-control" id="customer" name="customer" required>
+                        <option value="">Select a customer</option>
+                        {% for customer in customers %}
+                        <option value="{{ customer.id }}">{{ customer.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="total_payment">Total Payment Amount (₹)</label>
+                    <input type="number" class="form-control" id="total_payment" name="total_payment" step="0.01" min="0" required>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="payment_mode">Payment Mode</label>
+                    <select class="form-control" id="payment_mode" name="payment_mode" required>
+                        <option value="cash">Cash</option>
+                        <option value="account_pay">Account Pay</option>
+                        <option value="upi">UPI GPay / PhonePay</option>
+                    </select>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="attachment">Payment Attachment (Optional):</label>
+                    <input type="file" name="attachment" id="attachment" class="form-control-file">
+                </div>
+
+                <div class="form-group mb-3">
+                    <label for="notes">Notes (Optional):</label>
+                    <textarea name="notes" id="notes" class="form-control" rows="3"></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Process Payment</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <h3>Outstanding Invoices</h3>
+        <div id="invoices-container">
+            <p>Select a customer to see outstanding invoices</p>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('customer').addEventListener('change', function() {
+    const customerId = this.value;
+    if (customerId) {
+        fetch(`/accounts/api/customer-outstanding-invoices/?customer_id=${customerId}`)
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('invoices-container');
+                
+                if (data.invoices && data.invoices.length > 0) {
+                    let html = '<table class="table table-striped">';
+                    html += '<thead><tr><th>Invoice</th><th>Date</th><th>Total</th><th>Due</th></tr></thead>';
+                    html += '<tbody>';
+                    
+                    data.invoices.forEach(invoice => {
+                        html += `<tr>
+                            <td>${invoice.invoice_number}</td>
+                            <td>${invoice.invoice_date}</td>
+                            <td>₹${invoice.net_total_after_packaging.toFixed(2)}</td>
+                            <td>₹${invoice.due_amount.toFixed(2)}</td>
+                        </tr>`;
+                    });
+                    
+                    html += '</tbody></table>';
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<p>No outstanding invoices found for this customer</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching invoices:', error);
+                document.getElementById('invoices-container').innerHTML = 
+                    '<p class="text-danger">Error loading invoices. Please try again.</p>';
+            });
+    } else {
+        document.getElementById('invoices-container').innerHTML = 
+            '<p>Select a customer to see outstanding invoices</p>';
+    }
+});
+</script>
+{% endblock %} 

@@ -1,16 +1,18 @@
-from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse
+from django.db import transaction
 from io import BytesIO
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, LongTable
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from django.conf import settings
-from .models import PurchaseInvoice
-from decimal import Decimal
+from .models import PurchaseInvoice,  Payment, SalesInvoice, SalesPayment, PurchaseVendor, Customer, Packaging_Invoice, Expense, Damages
+from decimal import Decimal, InvalidOperation
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
-import os
+import os, textwrap
 from reportlab.lib.units import inch
 from reportlab.platypus import Frame
 from django.db.models import Sum, F, ExpressionWrapper, DecimalField, Q
@@ -22,11 +24,17 @@ from xhtml2pdf import pisa
 from django.contrib.staticfiles.finders import find
 import base64
 from django.contrib.admin.views.decorators import staff_member_required
-from .models import PurchaseInvoice, SalesInvoice, Expense, Damages, PurchaseVendor, Customer, Packaging_Invoice, PurchaseProduct
+from .models import PurchaseInvoice, SalesInvoice, Expense, Damages, PurchaseVendor, Customer, Packaging_Invoice, PurchaseProduct, InventoryStatus
 from django.urls import reverse
 from django.utils.dateparse import parse_date
+from django.contrib import messages
+import logging
+import io
+import xlsxwriter
 import datetime  # Import datetime module instead of just datetime class
+
 # Removed VendorBulkPayment, PaymentAllocation
+
 
 
 # Font and Logo Setup
@@ -38,6 +46,8 @@ pdfmetrics.registerFont(TTFont('DejaVuSans', FONT_PATH))
 pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', BOLD_FONT_PATH))
 pdfmetrics.registerFont(TTFont('NotoSans', FONT_PATH))
 pdfmetrics.registerFont(TTFont('NotoSans-Bold', BOLD_FONT_PATH))
+def is_superuser(user):
+    return user.is_superuser
 
 @staff_member_required
 def admin_dashboard(request):
@@ -73,6 +83,7 @@ def admin_dashboard(request):
     vendor_commission_total = total_purchase_before_commission * commission_rate
     total_purchase = total_purchase_before_commission - vendor_commission_total
 
+
     # Filter sales invoices by date if provided
     sales_invoices = SalesInvoice.objects.all()
     if from_date:
@@ -80,12 +91,15 @@ def admin_dashboard(request):
     if to_date:
         sales_invoices = sales_invoices.filter(invoice_date__lte=to_date)
 
+
+
     # Calculate total sales using net_total_after_packaging (final invoice total including crates)
     total_sales_before_commission = sum(invoice.net_total or Decimal('0') for invoice in sales_invoices)
     # Customer commission is equal to the total gross weight (₹1 per kg)
     customer_commission_total = sum(invoice.total_gross_weight or Decimal('0') for invoice in sales_invoices)
+    # Final total sales including packaging and commission
     total_sales = sum(invoice.net_total_after_packaging or Decimal('0') for invoice in sales_invoices)
-
+    print(f"DEBUG total_sales: {total_sales}")  # Basic console debug
     # Filter expenses by date if provided
     expenses = Expense.objects.all()
     if from_date:
@@ -116,15 +130,26 @@ def admin_dashboard(request):
     profit_loss = total_sales - (total_purchase + total_expenses + total_damages)
 
     # Highest Due Customers - no changes needed if these already account for commission
-    highest_due_customers = Customer.objects.annotate(
-        total_sales_amount=Sum('sales_invoices__sales_products__total'),
-        total_paid_amount=Sum('sales_invoices__payments__amount')
-    ).annotate(
-        due=ExpressionWrapper(
-            F('total_sales_amount') - F('total_paid_amount'),
-            output_field=DecimalField()
-        )
-    ).order_by('-due')[:3]  # Show only top 3 customers with highest dues
+    customers = Customer.objects.prefetch_related('sales_invoices', 'sales_invoices__payments').all()
+    customer_dues = []
+
+    for customer in customers:
+        total_sales = sum(invoice.net_total_after_packaging or Decimal('0') for invoice in customer.sales_invoices.all())
+        total_paid = sum(payment.amount or Decimal('0') for invoice in customer.sales_invoices.all() for payment in invoice.payments.all())
+        due_amount = total_sales - total_paid
+
+        customer_dues.append({
+            'customer': customer,
+            'due': due_amount
+        })
+
+    # Sort by due amount and get top 3
+    customer_dues.sort(key=lambda x: x['due'], reverse=True)
+    highest_due_customers = [item['customer'] for item in customer_dues[:3]]
+
+    # Set the due amount on each customer object for template access
+    for customer, due_data in zip(highest_due_customers, customer_dues[:3]):
+        customer.due = due_data['due']
 
     # Highest Due Vendors - use full amount
     highest_due_vendors = PurchaseVendor.objects.annotate(
@@ -142,8 +167,8 @@ def admin_dashboard(request):
     available_lots = [lot for lot in all_lots if lot.available_quantity > 0][:10]
 
     context = {
-        'total_purchase': total_purchase,
         'total_sales': total_sales,
+        'total_purchase': total_purchase,
         'total_expenses': total_expenses,
         'total_damages': total_damages,
         'total_packaging_cost': total_packaging_cost,
@@ -392,6 +417,7 @@ def generate_invoice_pdf(request, invoice_id):
     response.write(buffer.read())
     return response
 
+@staff_member_required
 def vendor_summary(request):
     vendors = PurchaseVendor.objects.all()
     selected_vendor_id = request.GET.get('vendor_id')
@@ -473,7 +499,15 @@ def generate_sales_invoice_pdf(request, invoice_id):
         ["Vendor Name:", invoice.vendor.name,],
         ["Contact No:", invoice.vendor.contact_number or "N/A", "Vehicle No.", invoice.vehicle_number or "N/A" ],
         [ "Reference", invoice.reference or "", "Gross Vehicle Weight:", f"{invoice.gross_vehicle_weight}"],
-        ["LOT NO:", ", ".join([sl.purchase_invoice.lot_number for sl in invoice.sales_lots.all()]) or "N/A", "", ""],
+        [
+    "LOT NO:",
+    "\n".join(textwrap.wrap(
+        ", ".join([sl.purchase_invoice.lot_number for sl in invoice.sales_lots.all()]),
+        width=65  # Adjust this width as needed
+    )) if invoice.sales_lots.exists() else "N/A",
+    "",
+    ""
+],
     ]
 
     header_table = Table(header_data, colWidths=[1.25*inch, 1.5*inch, 1.75*inch, 1.5*inch])
@@ -519,7 +553,7 @@ def generate_sales_invoice_pdf(request, invoice_id):
 
     # Sales Product Table - Improved layout
     product_header = [
-        "S/No", "Product", "Gross Weight", "Net Weight",
+        "S/No", "Product","Lot NO", "Gross Weight", "Net Weight",
         "Price/Kg", "Discount", "Rotten", "Total"
     ]
     product_data = [product_header]
@@ -528,6 +562,7 @@ def generate_sales_invoice_pdf(request, invoice_id):
         product_data.append([
             str(idx),
             sp.product.name,
+            sp.lot_number,
             f"{sp.gross_weight:.2f} Kg",
             f"{sp.net_weight:.2f} Kg",
             f"₹ {sp.price:.2f}",
@@ -537,8 +572,8 @@ def generate_sales_invoice_pdf(request, invoice_id):
         ])
 
     product_table = Table(product_data,
-                         colWidths=[0.4*inch, 1.8*inch, 1*inch, 1*inch,
-                                   0.9*inch, 0.8*inch, 0.9*inch, 1.2*inch])
+                         colWidths=[0.4*inch, 1.8*inch,0.8*inch, 0.9*inch, 0.9*inch,
+                                   0.8*inch, 0.7*inch, 0.8*inch, 1*inch])
 
     product_table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
@@ -869,6 +904,7 @@ def homepage(request):
     '''
     return HttpResponse(html_content)
 
+@staff_member_required
 def vendor_purchase_summary(request):
     # Get filter parameters
     from_date_str = request.GET.get('from_date')
@@ -909,10 +945,10 @@ def vendor_purchase_summary(request):
         total_purchases = sum(invoice.net_total for invoice in purchase_invoices)
         total_cash_cutting = sum(invoice.net_total * Decimal('0.02') for invoice in purchase_invoices)
         total_payments = sum(invoice.paid_amount for invoice in purchase_invoices)
-        due_amount = total_purchases - total_cash_cutting - total_payments
+        due_amount = total_purchases -total_cash_cutting - total_payments
 
         # Add calculated data
-        vendor.total_purchases = total_purchases
+        vendor.total_purchases = total_purchases - total_cash_cutting
         vendor.total_payments = total_payments
         vendor.due_amount = due_amount
         vendor_data.append(vendor)
@@ -945,6 +981,8 @@ def vendor_purchase_summary(request):
     }
     return render(request, 'Accounts/vendor_purchase_summary.html', context)
 
+@login_required
+@user_passes_test(is_superuser)
 def customer_purchase_summary(request):
     # Get filter parameters
     from_date_str = request.GET.get('from_date')
@@ -1048,14 +1086,16 @@ def vendor_invoice_detail(request, vendor_id):
         invoices = invoices.filter(date__lte=to_date)
 
     # Calculate totals
+    # Calculate totals
     total_purchases = sum(invoice.net_total for invoice in invoices)
+    total_cash_cutting = sum(invoice.net_total * Decimal('0.02') for invoice in invoices)
     total_payments = sum(invoice.paid_amount for invoice in invoices)
-    total_due = total_purchases - total_payments
+    total_due = total_purchases - total_cash_cutting - total_payments
 
     context = {
         'vendor': vendor,
         'invoices': invoices,
-        'total_purchases': total_purchases,
+        'total_purchases': total_purchases - total_cash_cutting,
         'total_payments': total_payments,
         'total_due': total_due,
         'from_date': from_date_str,
@@ -1064,18 +1104,39 @@ def vendor_invoice_detail(request, vendor_id):
 
     return render(request, 'Accounts/vendor_invoice_detail.html', context)
 
+@login_required
+@user_passes_test(is_superuser)
 def customer_invoice_detail(request, customer_id):
     customer = get_object_or_404(Customer, pk=customer_id)
+    # Get date filters from request
+    from_date_str = request.GET.get('from_date')
+    to_date_str = request.GET.get('to_date')
+
+    # Parse dates
+    from_date = parse_date(from_date_str) if from_date_str else None
+    to_date = parse_date(to_date_str) if to_date_str else None
+
+    # Get filtered invoices
     invoices = customer.sales_invoices.all().order_by('-invoice_date')
 
-    total_due = Decimal('0')
-    for invoice in invoices:
-        total_due += invoice.due_amount # Assuming due_amount is calculated correctly
+    if from_date:
+        invoices = invoices.filter(invoice_date__gte=from_date)
+    if to_date:
+        invoices = invoices.filter(invoice_date__lte=to_date)
+
+    # Calculate totals using Python sum() like in customer_purchase_summary
+    total_sales = sum(invoice.net_total_after_packaging for invoice in invoices)
+    total_payments = sum(invoice.paid_amount for invoice in invoices)
+    total_due = total_sales - total_payments
 
     context = {
         'customer': customer,
         'invoices': invoices,
+        'total_sales': total_sales,
+        'total_payments': total_payments,
         'total_due': total_due,
+        'from_date': from_date_str,
+        'to_date': to_date_str,
     }
     return render(request, 'Accounts/customer_invoice_detail.html', context)
 
@@ -1155,3 +1216,284 @@ def test_connection(request):
     Simple view to test server connection.
     """
     return HttpResponse("Server is running correctly! Connection test successful.")
+
+def vendor_bulk_payment(request):
+    if request.method == 'POST':
+        vendor_id = request.POST.get('vendor')
+        payment_mode = request.POST.get('payment_mode', 'cash')
+
+        # Validate total payment
+        try:
+            total_payment = Decimal(request.POST.get('total_payment', '0'))
+        except InvalidOperation:
+            messages.error(request, "Invalid payment amount. Enter a numeric value.")
+            return redirect('vendor_bulk_payment')
+
+        if not vendor_id or total_payment <= 0:
+            messages.error(request, "Please select a vendor and enter a valid payment amount")
+            return redirect('vendor_bulk_payment')
+
+        vendor = get_object_or_404(PurchaseVendor, id=vendor_id)
+        unpaid_invoices = []
+
+        # Get unpaid invoices with due amounts
+        for invoice in PurchaseInvoice.objects.filter(vendor=vendor):
+            due_amount = invoice.net_total_after_cash_cutting - invoice.paid_amount
+            if due_amount > 0:
+                unpaid_invoices.append({
+                    'invoice': invoice,
+                    'due_amount': due_amount
+                })
+
+        # Sort invoices by date (oldest first)
+        unpaid_invoices.sort(key=lambda x: x['invoice'].date)
+
+        remaining_payment = total_payment
+        payment_details = []
+
+        # Atomic transaction to ensure data consistency
+        try:
+            with transaction.atomic():
+                for invoice_data in unpaid_invoices:
+                    if remaining_payment <= 0:
+                        break
+
+                    due_amount = invoice_data['due_amount']
+                    payment_amount = min(due_amount, remaining_payment)
+
+                    if payment_amount > 0:
+                        # Create payment
+                        payment = Payment.objects.create(
+                            invoice=invoice_data['invoice'],
+                            amount=payment_amount,
+                            payment_mode=payment_mode
+                        )
+
+                        # DO NOT UPDATE invoice.paid_amount HERE
+                        payment_details.append({
+                            'invoice': invoice_data['invoice'],
+                            'amount': payment_amount
+                        })
+                        remaining_payment -= payment_amount
+
+        except Exception as e:
+            messages.error(request, f"Payment failed: {str(e)}")
+            return redirect('vendor_bulk_payment')
+
+        if remaining_payment > 0:
+            messages.warning(
+                request,
+                f"Remaining amount of ₹{remaining_payment:.2f} was not applied to any invoices"
+            )
+
+        return render(request, 'Accounts/vendor_bulk_payment_receipt.html', {
+            'vendor': vendor,
+            'total_payment': total_payment,
+            'payment_details': payment_details,
+            'remaining_payment': remaining_payment,
+            'today': datetime.date.today()
+        })
+
+    # GET request - show form
+    vendors = PurchaseVendor.objects.all()
+    return render(request, 'Accounts/vendor_bulk_payment.html', {
+        'vendors': vendors
+    })
+
+@login_required
+@user_passes_test(is_superuser)
+def inventory_summary(request):
+    if request.method == 'POST':
+        lot_id = request.POST.get('lot_id')
+        status = request.POST.get('status')
+        quantity = Decimal(request.POST.get('quantity'))
+        notes = request.POST.get('notes')
+
+        lot = get_object_or_404(PurchaseInvoice, id=lot_id)
+
+        # Validate quantity
+        if quantity > lot.available_quantity:
+            return JsonResponse({
+                'error': f'Cannot update status for {quantity}kg. Only {lot.available_quantity}kg available.'
+            }, status=400)
+
+        # Create new inventory status
+        InventoryStatus.objects.create(
+            purchase_invoice=lot,
+            status=status,
+            quantity=quantity,
+            notes=notes,
+            created_by=request.user
+        )
+
+        return redirect('inventory_summary')
+
+    # Get all lots with their current status
+    lots = PurchaseInvoice.objects.select_related('vendor').prefetch_related(
+        'purchase_products',
+        'sales_lots'
+    ).order_by('-date')
+
+    lot_data = []
+
+    for lot in lots:
+        # Calculate total purchased
+        total_purchased = sum(product.quantity for product in lot.purchase_products.all())
+
+        # Calculate total sold
+        total_sold = lot.sales_lots.aggregate(total=Sum('quantity'))['total'] or Decimal('0.00')
+
+        # Calculate current stock
+        current_stock = total_purchased - total_sold
+
+        # Get latest status
+        try:
+            latest_status = InventoryStatus.objects.filter(purchase_invoice=lot).order_by('-created_at').first()
+        except InventoryStatus.DoesNotExist:
+            latest_status = None
+
+        lot_data.append({
+            'id': lot.id,
+            'lot_number': lot.lot_number,
+            'date': lot.date,
+            'total_purchased': total_purchased,
+            'total_sold': total_sold,
+            'current_stock': current_stock if current_stock >= 0 else Decimal('0.00'),
+            'current_status': latest_status.status.title() if latest_status else 'Available',
+            'last_modified': latest_status.updated_at if latest_status else lot.date,
+            'modified_by': latest_status.created_by.get_full_name() if latest_status and latest_status.created_by else 'System'
+        })
+
+    context = {
+        'lots': lot_data,
+        'title': 'Inventory Summary'
+    }
+
+    return render(request, 'Accounts/inventory_summary.html', context)
+
+@login_required
+@user_passes_test(is_superuser)
+def export_inventory(request):
+    # Create a new Excel workbook
+    output = io.BytesIO()
+    workbook = xlsxwriter.Workbook(output)
+    worksheet = workbook.add_worksheet('Inventory Summary')
+
+    # Add headers
+    headers = ['Lot Number', 'Purchase Date', 'Total Purchased', 'Total Sold', 'Current Stock',
+              'Current Status', 'Last Modified', 'Modified By']
+    for col, header in enumerate(headers):
+        worksheet.write(0, col, header)
+
+    # Get data
+    lots = PurchaseInvoice.objects.all().order_by('-date')
+    for row, lot in enumerate(lots, start=1):
+        total_purchased = sum(product.quantity for product in lot.purchase_products.all())
+        total_sold = lot.sales_lots.aggregate(total=Sum('quantity'))['total'] or Decimal('0.00')
+        latest_status = lot.inventory_statuses.first()
+
+        worksheet.write(row, 0, lot.lot_number)
+        worksheet.write(row, 1, lot.date.strftime('%Y-%m-%d'))
+        worksheet.write(row, 2, float(total_purchased))
+        worksheet.write(row, 3, float(total_sold))
+        worksheet.write(row, 4, float(lot.available_quantity))
+        worksheet.write(row, 5, latest_status.status.title() if latest_status else 'Available')
+        worksheet.write(row, 6, latest_status.updated_at.strftime('%Y-%m-%d %H:%M') if latest_status else lot.date.strftime('%Y-%m-%d'))
+        worksheet.write(row, 7, latest_status.created_by.get_full_name() if latest_status and latest_status.created_by else 'System')
+
+    workbook.close()
+    output.seek(0)
+
+    response = HttpResponse(
+        output.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename=inventory_summary.xlsx'
+    return response
+
+@staff_member_required
+def customer_bulk_payment(request):
+    if request.method == 'POST':
+        customer_id = request.POST.get('customer')
+        payment_mode = request.POST.get('payment_mode', 'cash')
+        notes = request.POST.get('notes', '')
+        attachment = request.FILES.get('attachment')
+
+        # Validate total payment
+        try:
+            total_payment = Decimal(request.POST.get('total_payment', '0'))
+        except InvalidOperation:
+            messages.error(request, "Invalid payment amount. Enter a numeric value.")
+            return redirect('customer_bulk_payment')
+
+        if not customer_id or total_payment <= 0:
+            messages.error(request, "Please select a customer and enter a valid payment amount")
+            return redirect('customer_bulk_payment')
+
+        customer = get_object_or_404(Customer, id=customer_id)
+        unpaid_invoices = []
+
+        # Get unpaid invoices with due amounts
+        for invoice in SalesInvoice.objects.filter(vendor=customer):
+            if invoice.due_amount > 0:
+                unpaid_invoices.append({
+                    'invoice': invoice,
+                    'due_amount': invoice.due_amount
+                })
+
+        # Sort invoices by date (oldest first)
+        unpaid_invoices.sort(key=lambda x: x['invoice'].invoice_date)
+
+        remaining_payment = total_payment
+        payment_details = []
+
+        # Atomic transaction to ensure data consistency
+        try:
+            with transaction.atomic():
+                for invoice_data in unpaid_invoices:
+                    if remaining_payment <= 0:
+                        break
+
+                    due_amount = invoice_data['due_amount']
+                    payment_amount = min(due_amount, remaining_payment)
+
+                    if payment_amount > 0:
+                        # Create payment
+                        payment = SalesPayment.objects.create(
+                            invoice=invoice_data['invoice'],
+                            amount=payment_amount,
+                            payment_mode=payment_mode,
+                            notes=notes,
+                            attachment=attachment
+                        )
+
+                        payment_details.append({
+                            'invoice': invoice_data['invoice'],
+                            'amount': payment_amount
+                        })
+                        remaining_payment -= payment_amount
+
+        except Exception as e:
+            messages.error(request, f"Payment failed: {str(e)}")
+            return redirect('customer_bulk_payment')
+
+        if remaining_payment > 0:
+            messages.warning(
+                request,
+                f"Remaining amount of ₹{remaining_payment:.2f} was not applied to any invoices"
+            )
+
+        return render(request, 'Accounts/customer_bulk_payment_receipt.html', {
+            'customer': customer,
+            'total_payment': total_payment,
+            'payment_details': payment_details,
+            'remaining_payment': remaining_payment,
+            'payment_mode': payment_mode,
+            'today': datetime.date.today()
+        })
+
+    # GET request - show form
+    customers = Customer.objects.all()
+    return render(request, 'Accounts/customer_bulk_payment.html', {
+        'customers': customers
+    })

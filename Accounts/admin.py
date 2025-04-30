@@ -10,6 +10,7 @@ from django.db import models
 from django.http import HttpResponse
 
 
+
 admin.site.site_header = "Star Mango Supplies Korutla"   # Header displayed at the top of the admin
 admin.site.site_title = "Star Mango Supplies Korutla"     # Title tag for the admin pages
 admin.site.index_title = "Welcome to Star Mango Supplies Korutla Admin Panel"  # Title on the admin index page
@@ -39,9 +40,6 @@ class PurchaseProductInline(admin.TabularInline):
         return "-"  # Fallback if we can't predict
     serial_number.short_description = "Serial Number"
 
-    class Media:
-        js = ('admin/js/purchase_calculation.js',)
-
 # Inline for Payments within an Invoice
 class PaymentInline(admin.TabularInline):
     model = Payment
@@ -58,8 +56,9 @@ class PurchaseInvoiceAdmin(admin.ModelAdmin):
     list_filter = ('date', 'vendor')
     autocomplete_fields = ['vendor']
 
-    class Media:
-        js = ('admin/js/purchase_calculation.js',)
+    # Removing Media class to stop loading JavaScript
+    # class Media:
+    #     js = ('admin/js/purchase_calculation.js',)
 
     # Remove the static inlines list and replace with get_inlines method
     def get_inlines(self, request, obj=None):
@@ -180,8 +179,9 @@ class SalesProductInline(admin.TabularInline):
     model = SalesProduct
     extra = 1  # Number of empty forms to show initially
     readonly_fields = ('total', 'net_weight', 'serial_number')
-    fields = ('serial_number', 'product', 'gross_weight', 'discount', 'rotten', 'net_weight', 'price', 'total')
+    fields = ('serial_number', 'product', 'lot_number' , 'gross_weight', 'discount', 'rotten', 'net_weight', 'price', 'total') #added by azher
     ordering = ('serial_number',)  # Order products by serial number
+
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
@@ -207,10 +207,6 @@ class SalesPaymentInline(admin.TabularInline):
     extra = 1  # Number of empty forms to show
     fields = ('amount', 'payment_mode', 'attachment', 'date')
     readonly_fields = ('date',)
-class SalesLotInline(admin.TabularInline):
-    model = SalesLot
-    extra = 1
-    autocomplete_fields = ['purchase_invoice']
 
 # Admin for SalesInvoice
 class SalesInvoiceAdmin(admin.ModelAdmin):
@@ -254,6 +250,7 @@ class SalesInvoiceAdmin(admin.ModelAdmin):
         # Sales, Commission & Packaging Cost
         'invoice_number', # Read-only
         'net_total', # Read-only
+        'commission_percentage', # New commission percentage field
         'net_total_after_commission', # Read-only
         'packaging_total', # Read-only (Total packaging cost)
 
@@ -265,10 +262,7 @@ class SalesInvoiceAdmin(admin.ModelAdmin):
     ]
 
     def get_inlines(self, request, obj=None):
-        if obj and obj.pk:  # If editing existing object
-            if '_saveasnew' not in request.POST:  # Not saving as new
-                return [SalesPaymentInline]  # Only show payment inline
-        return [SalesLotInline, SalesProductInline, SalesPaymentInline]  # Show all inlines for new
+        return [SalesProductInline, SalesPaymentInline]  # Removed SalesLotInline
 
     search_fields = ('invoice_number', 'vendor__name', )
     list_filter = ('invoice_date',)
@@ -306,23 +300,14 @@ class SalesInvoiceAdmin(admin.ModelAdmin):
     print_invoice.short_description = "Print Invoice"
 
     def save_formset(self, request, form, formset, change):
-        """Only save the payment formset when editing an existing invoice."""
-        # Check if we are editing an existing invoice (change=True)
-        if change:
-            # Check if the current formset being processed is the SalesPaymentInline
-            if formset.model == SalesPayment:
-                # If it's the payment inline, save it as usual
-                super().save_formset(request, form, formset, change)
-            else:
-                # If it's NOT the payment inline (i.e., Lot or Product)
+        if change and not getattr(formset.instance, 'pk', None):
+            if hasattr(formset.instance, 'sales_invoice'):
+                # If this is a nested inline (formset inside another formset)
                 # and we are *editing*, do nothing. This prevents validation.
                 pass
         else:
             # If creating a new invoice (change=False), save all formsets as usual.
             super().save_formset(request, form, formset, change)
-
-    class Media:
-        js = ('admin/js/sales_invoice.js',)
 
     def response_change(self, request, obj):
         if "_print_without_payments" in request.POST:
@@ -444,6 +429,4 @@ admin.site.register(Damages, DamagesAdmin)
 admin.site.register(SalesLot) # Simple registration for now
 admin.site.register(Packaging_Invoice, packagingsAdmin)
 
-
-admin.register(SalesInvoice, SalesInvoiceAdmin)
 
